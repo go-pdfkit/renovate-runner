@@ -1,29 +1,28 @@
-# renovate-runner
+# renovate-runner — retired
 
-Runs [Renovate](https://docs.renovatebot.com) over the PDF fleet — every repo
-owned by `go-pdfkit`, `go-gfx`, `go-opentype` and `go-widgets` — from one daily
-GitHub Actions job.
+**Disabled on 2026-08-30.** Every organisation this watched now runs Renovate
+from its own `.github` repository, beside the preset it already held.
 
-## Why not the app
+## Why
 
-The hosted Mend app would be less work, and cannot be used here: installing a
-GitHub App on an organisation is an OAuth flow a person clicks through, and
-there is no API behind it. A token can do everything else, so a token does.
+It was given a token's whole hourly request budget and still ran out of it. Its
+first full pass reached 32 organisations of 109 and stopped on
+`rate-limit-exceeded`.
 
-## What it needs
+The failure was not the problem — it would have been re-run the next day. The
+problem is that it walked the list **in the same order every time**, so it would
+have died in the same place every time, and the last 77 organisations would
+never have been looked at at all. Silently, run after run, while the first 32
+kept opening pull requests and the whole thing kept looking like it worked.
 
-One secret, `RENOVATE_TOKEN`, a personal access token with `repo` and
-`workflow`. The `workflow` scope is not optional: without it every PR that
-touches `.github/workflows/*` is refused, and those are the ones the
-`github-actions` manager opens.
+Slicing the list across six hourly runs fixed that, and was a workaround for a
+shape that did not need to exist. One organisation is a few repositories: a run
+over it never comes near five thousand requests. There is nothing to slice,
+nothing to schedule around, and no list of names to keep current when an
+organisation is added — which is the other thing this repository had to carry,
+because `go-*` would have collided with the `go-ruby-*` runner.
 
-## The trap that makes a green run do nothing
-
-Renovate's default author is `bot@renovateapp.com`, and this account blocks
-pushes that expose a non-noreply email. Left alone, **every branch push is
-rejected and the run still reports success**. `gitAuthor` in `config.js` is
-what stops that.
-
-So a run is not verified by its own green tick. It is verified by there being
-`renovate/*` branches and open pull requests on a repo that had something to
-update.
+The config stays in the history, and so do the two traps written down in it:
+Renovate's default git author makes every branch it writes rejected **while the
+run still reports success**, and a toolchain bump counts as a minor update and
+will merge itself.
